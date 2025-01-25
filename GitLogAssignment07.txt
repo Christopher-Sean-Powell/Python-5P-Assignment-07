@@ -1,0 +1,637 @@
+commit ad72487ba44ca5d9fd1b0a3374c2110937959009
+Author: Chris <cspowell@ucsc.edu>
+Date:   Wed May 28 09:39:47 2014 -0700
+
+    I re-did a bunch of things, trying to figure out why my similarity values were off. I think that the program is working now.
+
+diff --git a/Assignment07.py b/Assignment07.py
+index c08b9d5..61ae05b 100644
+--- a/Assignment07.py
++++ b/Assignment07.py
+@@ -12,7 +12,7 @@ import sys
+ import math
+ 
+ 
+-# I got most of this next function from lecture on 5-15, and I reused this function from assignment 6.
++# I got most of this next function from lecture on 5-15, and was also used in assignment 6.
+ def sorted_keys_by_value (d):
+     ''' This function takes a dictionary as an input, and then orders that dictionary based on the values of each key.
+     This reordered list is returned as a list of tuples.'''
+@@ -29,7 +29,8 @@ def sorted_keys_by_value (d):
+ 
+ # I got this function from class on 5-20. I also got some help on the function from Professor Miller through Piazza.
+ def no_punct(s):
+-    '''Removes all punctuation from a given string.'''
++    '''Removes all punctuation from a given string. It is formatted to work for a text entry with more than one line
++    of text.'''
+     l = []
+     for the_line in s:
+         the_line = the_line.lower()
+@@ -110,7 +111,8 @@ def TF_IDF (words_dict, IDF):
+     TF_IDF = {}
+     keys = words_dict.keys()
+     for key in keys:
+-        TF_IDF[key] = IDF[key] * words_dict[key]
++        TF_IDF[key] = IDF[key]
++        TF_IDF[key] *= words_dict[key]
+     return TF_IDF
+ 
+ 
+@@ -157,8 +159,8 @@ def query_no_punct(s):
+ # major change, just replacing the name of the no_punct function within.
+ def query_count_words (s):
+     ''' This function takes a string as input, and then removes all punctuation from that string using the function
+-        no_punct(s), converts the whole string to lower case, and then splits the string up into a list of its
+-        individual words. Then the number of appearances of each word are counted and returned as a dictionary.'''
++    no_punct(s), converts the whole string to lower case, and then splits the string up into a list of its
++    individual words. Then the number of appearances of each word are counted and returned as a dictionary.'''
+     S = query_no_punct(s)
+     l = S.split()
+     d = {}
+@@ -170,18 +172,20 @@ def query_count_words (s):
+     return d
+ 
+ 
+-def query_similarity (corpus, words_q, len_q):
+-    '''This function finds how relevant documents are to a search query. This is mostly only useful for the program
+-        "Assignment07", as it requires information in that program to run properly. The output is a dictionary with the
+-        documents as the keys and the document similarity as the values.'''
++def query_similarity (corpus, words_q):
++    '''This function finds how relevant documents in a corpus are to a search query. This is mostly only useful for the
++    program "Assignment07", as it requires information in that program to run properly. The output is a dictionary with
++    the documents as the keys and the document similarity as the values.'''
+     q_sim = {}
+     IDF = inverse_document_frequency(corpus)
+     corpus_keys = corpus.keys()
+     for key in corpus_keys:
+         new_dict = corpus[key]
+-        tf_idf = TF_IDF(new_dict, IDF)
+-        new_len = length(tf_idf)
+-        q_sim[key] = similarity(words_q,new_dict,len_q, new_len)
++        tf_idf_1 = TF_IDF(new_dict, IDF)
++        tf_idf_q = TF_IDF(words_q, IDF)
++        len_1 = length(tf_idf_1)
++        len_q = length(tf_idf_q)
++        q_sim[key] = similarity(tf_idf_q,tf_idf_1,len_q, len_1)
+     return q_sim
+ 
+ 
+@@ -192,15 +196,12 @@ while Q != "done":
+         q_words = query_count_words(Q)
+         q_TF_IDF = TF_IDF(q_words, IDF)
+         q_length = length(q_TF_IDF)
+-        query_sim = query_similarity(corpus, q_words, q_length)
++        query_sim = query_similarity(corpus, q_words)
+         query_output = sorted_keys_by_value(query_sim)
+-        for k in range (3):
+-            print '{0:18s} : {1:.3f}%'.format (query_output[k][0],  query_output[k][1])
++        for k in range (20):
++            print '{0:18s} : {1:.3f}%'.format (query_output[k][0],  query_output[k][1] * 100)
+     elif Q == "done":
+         print "Thank you for using the document search system!"
+ 
+-
+-# Note: I'm not sure why the similarity values are coming out incorrectly, I'm just hoping that whether the values are
+-# correct or not it is properly displaying the documents that correspond "best" to the entered query. If that is true,
+-# then whether the numbers are off or not my search engine runs OK!
+-
++# Note: my similarity values seem to be coming out kind of high, but it may just be because I was testing it against
++# only a couple documents...
+\ No newline at end of file
+
+commit 0a1954cb222ea642e877efd117fa4f0ca9e4434b
+Author: Chris <cspowell@ucsc.edu>
+Date:   Mon May 26 23:20:48 2014 -0700
+
+    Pretty much finished, but the numbers for the document similarity are not quite right. Hopefully it still picks the correct documents whether the numbers are off or not....
+
+diff --git a/Assignment07.py b/Assignment07.py
+index 891a70d..c08b9d5 100644
+--- a/Assignment07.py
++++ b/Assignment07.py
+@@ -104,12 +104,12 @@ def inverse_document_frequency (dict):
+ IDF = inverse_document_frequency(corpus)
+ 
+ 
+-def TF_IDF (doc, IDF):
++def TF_IDF (words_dict, IDF):
+     ''' This function multiplies the frequency of each term in a given document by the IDF of the term (from the
+-    IDF function). Thus, the function returns the TF-IDF. '''
++    IDF function). Thus, the function returns the TF-IDF, as a dictionary. '''
+     TF_IDF = {}
+-    words_dict = count_words(doc)
+-    for key in words_dict:
++    keys = words_dict.keys()
++    for key in keys:
+         TF_IDF[key] = IDF[key] * words_dict[key]
+     return TF_IDF
+ 
+@@ -117,9 +117,9 @@ def TF_IDF (doc, IDF):
+ def length (TF_IDF):
+     '''This function takes  the TF-IDF of a document as input. It then uses the TF-IDF values to calculate the
+     vector length of the document.'''
+-    length = 0
++    length = 0.0
+     for value in TF_IDF:
+-        length += (TF_IDF[value]) ** 2
++        length += ((TF_IDF[value]) ** 2)
+     length = length ** .5
+     return length
+ 
+@@ -133,22 +133,74 @@ def similarity (d1, d2, length_d1, length_d2):
+     for term in d1:
+         if term in d2:
+            DP += d1[term] * d2[term]
+-    cos = DP (length_d1 * length_d2)
++    cos = DP / (length_d1 * length_d2)
+     return cos
+ 
+ 
+-q = str(raw_input("What is your search query?"))
+-q_words = count_words(q)
+-q_dict = {"query": q_words}
+-q_IDF = inverse_document_frequency(q_dict)
+-q_TF_IDF = TF_IDF(q_words, q_IDF)
+-q_length = length(q_TF_IDF)
++# I wrote this function because my other no_punct function was very complicated in order to account for different lines
++# in a file, and as a result it was not working for just a regular string. So, I used the simpler no_punct function
++# provided in class to remove punctuation from the query.
++def query_no_punct(s):
++    '''Removes punctuation from a string.'''
++    l = []
++    s= s.lower()
++    for ltr in s:
++        if 'a' <= ltr <= 'z':
++            l.append (ltr)
++        elif ltr == ' ':
++            l.append(ltr)
++    new_s = ''.join(l)
++    return new_s
+ 
+ 
+-def query_similarity (query, corpus):
++# Since I wrote another no_punct function, I had to rewrite the count_words function for the query. This wasn't a
++# major change, just replacing the name of the no_punct function within.
++def query_count_words (s):
++    ''' This function takes a string as input, and then removes all punctuation from that string using the function
++        no_punct(s), converts the whole string to lower case, and then splits the string up into a list of its
++        individual words. Then the number of appearances of each word are counted and returned as a dictionary.'''
++    S = query_no_punct(s)
++    l = S.split()
++    d = {}
++    for word in l:
++        if word in d:
++            d[word] += 1
++        else:
++            d[word] = 1
++    return d
++
++
++def query_similarity (corpus, words_q, len_q):
++    '''This function finds how relevant documents are to a search query. This is mostly only useful for the program
++        "Assignment07", as it requires information in that program to run properly. The output is a dictionary with the
++        documents as the keys and the document similarity as the values.'''
+     q_sim = {}
+-    len_q =
++    IDF = inverse_document_frequency(corpus)
+     corpus_keys = corpus.keys()
+     for key in corpus_keys:
+-        new_dict = count_words
+-        q_sim[key] = similarity()
+\ No newline at end of file
++        new_dict = corpus[key]
++        tf_idf = TF_IDF(new_dict, IDF)
++        new_len = length(tf_idf)
++        q_sim[key] = similarity(words_q,new_dict,len_q, new_len)
++    return q_sim
++
++
++Q = 0
++while Q != "done":
++    Q = str(raw_input("What is your search query?"))
++    if Q != "done":
++        q_words = query_count_words(Q)
++        q_TF_IDF = TF_IDF(q_words, IDF)
++        q_length = length(q_TF_IDF)
++        query_sim = query_similarity(corpus, q_words, q_length)
++        query_output = sorted_keys_by_value(query_sim)
++        for k in range (3):
++            print '{0:18s} : {1:.3f}%'.format (query_output[k][0],  query_output[k][1])
++    elif Q == "done":
++        print "Thank you for using the document search system!"
++
++
++# Note: I'm not sure why the similarity values are coming out incorrectly, I'm just hoping that whether the values are
++# correct or not it is properly displaying the documents that correspond "best" to the entered query. If that is true,
++# then whether the numbers are off or not my search engine runs OK!
++
+
+commit d8425309e76ff97f394dba4fd845fde537b5e9df
+Author: Chris <cspowell@ucsc.edu>
+Date:   Mon May 26 20:13:35 2014 -0700
+
+    I added the function to sort a dictionary based on its values into this program. Originally from assignment06.
+
+diff --git a/Assignment07.py b/Assignment07.py
+index 0df6a37..891a70d 100644
+--- a/Assignment07.py
++++ b/Assignment07.py
+@@ -11,6 +11,22 @@ import sys
+ 
+ import math
+ 
++
++# I got most of this next function from lecture on 5-15, and I reused this function from assignment 6.
++def sorted_keys_by_value (d):
++    ''' This function takes a dictionary as an input, and then orders that dictionary based on the values of each key.
++    This reordered list is returned as a list of tuples.'''
++    counts = []
++    for k in d.keys():
++        counts.append ((d[k], k))
++    counts.sort()
++    counts.reverse()
++    sorted_keys = []
++    for item in counts:
++        sorted_keys.append ((item[1], item[0]))
++    return sorted_keys
++
++
+ # I got this function from class on 5-20. I also got some help on the function from Professor Miller through Piazza.
+ def no_punct(s):
+     '''Removes all punctuation from a given string.'''
+
+commit b04306ccf1aeb3c4ad7837d14955134a1eb7709a
+Author: Chris <cspowell@ucsc.edu>
+Date:   Mon May 26 19:51:08 2014 -0700
+
+    I wrote the similarity function, and started working on the raw_input and the actual similarity calculations for the entered query and the corpus.
+
+diff --git a/Assignment07.py b/Assignment07.py
+index 8a8492c..0df6a37 100644
+--- a/Assignment07.py
++++ b/Assignment07.py
+@@ -33,7 +33,7 @@ def no_punct(s):
+     return new_s
+ 
+ 
+-# I reused this function from assignment 06.
++# I reused this function from assignment 06. It was originally given (partially) in class on 5-15.
+ def count_words (s):
+     ''' This function takes a string as input, and then removes all punctuation from that string using the function
+     no_punct(s), converts the whole string to lower case, and then splits the string up into a list of its individual
+@@ -108,3 +108,31 @@ def length (TF_IDF):
+     return length
+ 
+ 
++# I got some of this function from class on 5-20 (the dot product part). I edited it and added more code to complete
++# the function.
++def similarity (d1, d2, length_d1, length_d2):
++    ''' Computes the cosine similarity of documents d1 and d2 (specified by dictionaries) using the lengths
++    provided. Returns the "similarity value".'''
++    DP = 0.0
++    for term in d1:
++        if term in d2:
++           DP += d1[term] * d2[term]
++    cos = DP (length_d1 * length_d2)
++    return cos
++
++
++q = str(raw_input("What is your search query?"))
++q_words = count_words(q)
++q_dict = {"query": q_words}
++q_IDF = inverse_document_frequency(q_dict)
++q_TF_IDF = TF_IDF(q_words, q_IDF)
++q_length = length(q_TF_IDF)
++
++
++def query_similarity (query, corpus):
++    q_sim = {}
++    len_q =
++    corpus_keys = corpus.keys()
++    for key in corpus_keys:
++        new_dict = count_words
++        q_sim[key] = similarity()
+\ No newline at end of file
+
+commit 87b9eaf21f0824f53372a77b35c5a94a63f86a6b
+Author: Chris <cspowell@ucsc.edu>
+Date:   Mon May 26 18:33:26 2014 -0700
+
+    I had to redo a bunch of work, and essentially re-did everything I had already written. However- it all works now at least!
+
+diff --git a/Assignment07.py b/Assignment07.py
+index 15fadc8..8a8492c 100644
+--- a/Assignment07.py
++++ b/Assignment07.py
+@@ -11,18 +11,24 @@ import sys
+ 
+ import math
+ 
+-
+-# I got this function from class on 5-20.
+-def no_punct (s):
++# I got this function from class on 5-20. I also got some help on the function from Professor Miller through Piazza.
++def no_punct(s):
+     '''Removes all punctuation from a given string.'''
+     l = []
+-    for ltr in s:
+-        if 'A' <= ltr <= 'z':
+-            l.append(ltr)
+-        elif ltr == ' ':
+-            l.append(ltr)
+-        else:
+-            pass
++    for the_line in s:
++        the_line = the_line.lower()
++        words = the_line.split()
++        for word in words:
++            l.append(" ")
++            for ltr in word:
++                if "a" <= ltr <= "z":
++                    l.append(ltr)
++                elif ltr == " ":
++                    l.append(ltr)
++                elif ltr == "-":
++                    l.append(" ")
++            else:
++                    l.append(" ")
+     new_s = ''.join(l)
+     return new_s
+ 
+@@ -32,31 +38,31 @@ def count_words (s):
+     ''' This function takes a string as input, and then removes all punctuation from that string using the function
+     no_punct(s), converts the whole string to lower case, and then splits the string up into a list of its individual
+     words. Then the number of appearances of each word are counted and returned as a dictionary.'''
+-    s = no_punct(s)
+-    s = s.lower()
+-    l = s.split()
++    S = no_punct(s)
++    l = S.split()
+     d = {}
+-    for w in l:
+-        if w in d:
+-            d[w] += 1
++    for word in l:
++        if word in d:
++            d[word] += 1
+         else:
+-            d[w] = 1
++            d[word] = 1
+     return d
+ 
+ 
+-def build_corpus():
++def define_corpus(configuration):
+     '''This function takes the list provided through sys.argv, which contains the configuration file (that reads the
+     name of a document on each line) and opens each of the documents. It then processes the document using the
+     count_words function, and adds this information to a dictionary of dictionaries, which is the output.'''
+     corpus = {}
+-    parameters = ["dickens.txt", "wells.txt", "stevenson.txt"]  # should be sys.argv[1:], is current just for testing.
+-    for element in parameters:
+-        element = str(element)
++    configuration_1 = open (configuration, "r")
++    for line in configuration_1:
++        element = line.strip()
+         handle = open (element, "r")
+         handle_1 = count_words(handle)
+         corpus[element] = handle_1
+     return corpus
+-corpus = build_corpus()
++
++corpus = define_corpus(sys.argv[1])
+ 
+ 
+ def inverse_document_frequency (dict):
+@@ -78,6 +84,7 @@ def inverse_document_frequency (dict):
+             IDF = math.log(float(len(keys))/(float(new_dict[word] + 1.0)))
+             IDF_dict[word] = IDF
+     return IDF_dict
++
+ IDF = inverse_document_frequency(corpus)
+ 
+ 
+@@ -101,11 +108,3 @@ def length (TF_IDF):
+     return length
+ 
+ 
+-
+-
+-
+-
+-
+-
+-
+-
+
+commit 6826de12e14e33327f8646e734f54334670134f6
+Author: Chris <cspowell@ucsc.edu>
+Date:   Sun May 25 22:53:38 2014 -0700
+
+    Wrote 2 more functions: one that computes the TF-IDF of a document, and ones that computes the vector length of a document (given the TF-IDF).
+
+diff --git a/Assignment07.py b/Assignment07.py
+index 7396a89..15fadc8 100644
+--- a/Assignment07.py
++++ b/Assignment07.py
+@@ -11,6 +11,7 @@ import sys
+ 
+ import math
+ 
++
+ # I got this function from class on 5-20.
+ def no_punct (s):
+     '''Removes all punctuation from a given string.'''
+@@ -25,6 +26,7 @@ def no_punct (s):
+     new_s = ''.join(l)
+     return new_s
+ 
++
+ # I reused this function from assignment 06.
+ def count_words (s):
+     ''' This function takes a string as input, and then removes all punctuation from that string using the function
+@@ -54,13 +56,14 @@ def build_corpus():
+         handle_1 = count_words(handle)
+         corpus[element] = handle_1
+     return corpus
+-
+ corpus = build_corpus()
+ 
++
+ def inverse_document_frequency (dict):
+     ''' Takes a dictionary of dictionaries as input. Each key in the outer dictionary corresponds with a document,
+     while the inner dictionary (for whom the name of the document is the key) holds the counts of each word that appear
+-    in that document. Then, this function calculates the IDF of each word in each of the documents.'''
++    in that document. Then, this function calculates the IDF of each word in each of the documents. The output is
++    returned as a dictionary with the words as the keys and the IDF as the values.'''
+     new_dict = {}
+     IDF_dict = {}
+     keys = dict.keys()  # len(keys) = number of documents in corpus = N
+@@ -75,11 +78,27 @@ def inverse_document_frequency (dict):
+             IDF = math.log(float(len(keys))/(float(new_dict[word] + 1.0)))
+             IDF_dict[word] = IDF
+     return IDF_dict
+-
+ IDF = inverse_document_frequency(corpus)
+ 
+ 
+-
++def TF_IDF (doc, IDF):
++    ''' This function multiplies the frequency of each term in a given document by the IDF of the term (from the
++    IDF function). Thus, the function returns the TF-IDF. '''
++    TF_IDF = {}
++    words_dict = count_words(doc)
++    for key in words_dict:
++        TF_IDF[key] = IDF[key] * words_dict[key]
++    return TF_IDF
++
++
++def length (TF_IDF):
++    '''This function takes  the TF-IDF of a document as input. It then uses the TF-IDF values to calculate the
++    vector length of the document.'''
++    length = 0
++    for value in TF_IDF:
++        length += (TF_IDF[value]) ** 2
++    length = length ** .5
++    return length
+ 
+ 
+ 
+
+commit ff31ef1300912a3a600dc552ab6105380cd620b0
+Author: Chris <cspowell@ucsc.edu>
+Date:   Sun May 25 18:47:36 2014 -0700
+
+    Wrote 2 new functions: one to compile the corpus of documents, and one to calculate the IDF of words in the documents. The corpus function is not quite finished, but it is good enough for now.
+
+diff --git a/Assignment07.py b/Assignment07.py
+index 4448e6b..7396a89 100644
+--- a/Assignment07.py
++++ b/Assignment07.py
+@@ -7,16 +7,21 @@ __author__ = 'Chris'
+ # Assignment07: Document Similarity
+ 
+ 
++import sys
++
++import math
+ 
+ # I got this function from class on 5-20.
+ def no_punct (s):
+-    '''Removes all punctuation from a string.'''
++    '''Removes all punctuation from a given string.'''
+     l = []
+     for ltr in s:
+         if 'A' <= ltr <= 'z':
+-            l.append (ltr)
++            l.append(ltr)
+         elif ltr == ' ':
+             l.append(ltr)
++        else:
++            pass
+     new_s = ''.join(l)
+     return new_s
+ 
+@@ -37,3 +42,51 @@ def count_words (s):
+     return d
+ 
+ 
++def build_corpus():
++    '''This function takes the list provided through sys.argv, which contains the configuration file (that reads the
++    name of a document on each line) and opens each of the documents. It then processes the document using the
++    count_words function, and adds this information to a dictionary of dictionaries, which is the output.'''
++    corpus = {}
++    parameters = ["dickens.txt", "wells.txt", "stevenson.txt"]  # should be sys.argv[1:], is current just for testing.
++    for element in parameters:
++        element = str(element)
++        handle = open (element, "r")
++        handle_1 = count_words(handle)
++        corpus[element] = handle_1
++    return corpus
++
++corpus = build_corpus()
++
++def inverse_document_frequency (dict):
++    ''' Takes a dictionary of dictionaries as input. Each key in the outer dictionary corresponds with a document,
++    while the inner dictionary (for whom the name of the document is the key) holds the counts of each word that appear
++    in that document. Then, this function calculates the IDF of each word in each of the documents.'''
++    new_dict = {}
++    IDF_dict = {}
++    keys = dict.keys()  # len(keys) = number of documents in corpus = N
++    for element in keys:
++        for key in dict[element]:
++            if key in new_dict:
++                new_dict[key] += 1
++            else:
++                new_dict[key] = 1
++    for word in new_dict:
++        if word not in IDF_dict:
++            IDF = math.log(float(len(keys))/(float(new_dict[word] + 1.0)))
++            IDF_dict[word] = IDF
++    return IDF_dict
++
++IDF = inverse_document_frequency(corpus)
++
++
++
++
++
++
++
++
++
++
++
++
++
+
+commit 94f29eaa51ed83b5d1d13128d0aa401c6fd56644
+Author: Chris <cspowell@ucsc.edu>
+Date:   Fri May 23 16:11:34 2014 -0700
+
+    I started by copying in the function to remove punctuation (from class) and my function from the previous assignment to count words.
+
+diff --git a/Assignment07.py b/Assignment07.py
+new file mode 100644
+index 0000000..4448e6b
+--- /dev/null
++++ b/Assignment07.py
+@@ -0,0 +1,39 @@
++__author__ = 'Chris'
++
++# Christopher Powell
++
++# cspowell@ucsc.edu
++
++# Assignment07: Document Similarity
++
++
++
++# I got this function from class on 5-20.
++def no_punct (s):
++    '''Removes all punctuation from a string.'''
++    l = []
++    for ltr in s:
++        if 'A' <= ltr <= 'z':
++            l.append (ltr)
++        elif ltr == ' ':
++            l.append(ltr)
++    new_s = ''.join(l)
++    return new_s
++
++# I reused this function from assignment 06.
++def count_words (s):
++    ''' This function takes a string as input, and then removes all punctuation from that string using the function
++    no_punct(s), converts the whole string to lower case, and then splits the string up into a list of its individual
++    words. Then the number of appearances of each word are counted and returned as a dictionary.'''
++    s = no_punct(s)
++    s = s.lower()
++    l = s.split()
++    d = {}
++    for w in l:
++        if w in d:
++            d[w] += 1
++        else:
++            d[w] = 1
++    return d
++
++
